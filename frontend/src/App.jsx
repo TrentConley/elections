@@ -75,7 +75,7 @@ export default function App() {
         throw new Error('Failed to load polls');
       }
       const data = await response.json();
-      setPolls(data);
+      setPolls(data.filter((poll) => poll.status === 'open'));
     } catch (error) {
       setPollsError(error.message || 'Unable to fetch polls');
     } finally {
@@ -168,7 +168,15 @@ export default function App() {
           throw new Error(detail || 'Unable to close poll');
         }
         const updated = await response.json();
-        setPolls((prev) => prev.map((poll) => (poll.id === updated.id ? updated : poll)));
+        setPolls((prev) => prev.filter((poll) => poll.id !== updated.id));
+        setVoteHistory((prev) => {
+          if (!prev[pollId]) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next[pollId];
+          return next;
+        });
         setActionMessage('Poll closed');
       } catch (error) {
         setPollsError(error.message || 'Unable to close poll');
