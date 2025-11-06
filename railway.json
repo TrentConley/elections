@@ -1,0 +1,10 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": [
+    "pip install -r requirements.txt",
+    "npm install --prefix frontend",
+    "npm run build --prefix frontend"
+  ],
+  "start": "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+}
+
