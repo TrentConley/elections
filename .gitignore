@@ -9,4 +9,3 @@ frontend/dist/
 # Environment
 .env
 
-.npm-cache/
