@@ -47,8 +47,8 @@ export default function AdminPanel({ disabled, onCreatePoll, onClosePoll, polls 
   return (
     <section className="sidebar">
       <div className="card">
-        <h2>Create a poll</h2>
-        <p className="helper">Add a title and at least two unique options.</p>
+        <h2>New poll</h2>
+        <p className="helper">Title plus two options. Keep it sharp.</p>
         <form className="stack" onSubmit={handleSubmit}>
           <label className="field">
             <span>Title</span>
@@ -56,7 +56,7 @@ export default function AdminPanel({ disabled, onCreatePoll, onClosePoll, polls 
               type="text"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Team lunch choice, sprint retro, …"
+              placeholder="Poll headline"
               required
             />
           </label>
@@ -69,7 +69,7 @@ export default function AdminPanel({ disabled, onCreatePoll, onClosePoll, polls 
                   type="text"
                   value={option}
                   onChange={(event) => handleOptionChange(index, event.target.value)}
-                  placeholder="Candidate name"
+                  placeholder="Option text"
                 />
               </label>
             ))}
@@ -77,14 +77,14 @@ export default function AdminPanel({ disabled, onCreatePoll, onClosePoll, polls 
 
           <div className="actions">
             <button className="text-button" type="button" onClick={addOptionField}>
-              Add another option
+              Add option
             </button>
             <div className="actions">
               <button className="text-button" type="button" onClick={resetForm}>
-                Reset
+                Clear
               </button>
               <button className="primary" type="submit" disabled={disabled}>
-                {disabled ? 'Creating…' : 'Launch poll'}
+                {disabled ? 'Creating…' : 'Launch'}
               </button>
             </div>
           </div>
@@ -93,9 +93,9 @@ export default function AdminPanel({ disabled, onCreatePoll, onClosePoll, polls 
       </div>
 
       <div className="card">
-        <h2>Active polls</h2>
+        <h2>Open polls</h2>
         {openPolls.length === 0 ? (
-          <p className="helper">No active polls right now.</p>
+          <p className="helper">None running yet.</p>
         ) : (
           <ul className="poll-list">
             {openPolls.map((poll) => {
@@ -107,7 +107,7 @@ export default function AdminPanel({ disabled, onCreatePoll, onClosePoll, polls 
                     <p className="helper">{totalVotes} vote{totalVotes === 1 ? '' : 's'}</p>
                   </div>
                   <button className="text-button" onClick={() => handleClose(poll.id)}>
-                    End poll
+                    Close poll
                   </button>
                 </li>
               );

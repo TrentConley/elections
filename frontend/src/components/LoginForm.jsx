@@ -22,15 +22,15 @@ export default function LoginForm({ onSubmit, error }) {
     <form className="stack" onSubmit={handleSubmit}>
       <div className="stack small">
         <h1>Quick Elections</h1>
-        <p className="tagline">Enter your name to join. Admins use the special keyword.</p>
+        <p className="tagline">Sign in and start.</p>
       </div>
       <label className="field">
-        <span>Name or admin keyword</span>
+        <span>Name or admin key</span>
         <input
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="e.g. TrentAdmin"
+          placeholder="Name or key"
           autoComplete="off"
           required
         />

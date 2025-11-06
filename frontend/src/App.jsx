@@ -141,7 +141,7 @@ export default function App() {
         }
         const poll = await response.json();
         setPolls((prev) => [poll, ...prev]);
-        setActionMessage('Poll created');
+        setActionMessage('Poll launched');
       } catch (error) {
         setPollsError(error.message || 'Unable to create poll');
         throw error;
@@ -197,7 +197,7 @@ export default function App() {
         const updated = await response.json();
         setPolls((prev) => prev.map((poll) => (poll.id === updated.id ? updated : poll)));
         setVoteHistory((prev) => ({ ...prev, [pollId]: optionId }));
-        setActionMessage('Vote submitted');
+        setActionMessage('Vote saved');
       } catch (error) {
         setPollsError(error.message || 'Unable to vote');
       }
@@ -219,12 +219,12 @@ export default function App() {
         <header className="app-header">
           <div>
             <h1>Quick Elections</h1>
-            <p className="tagline">Log in, launch a poll, watch the numbers live.</p>
+            <p className="tagline">Instant polls. Minimal noise.</p>
           </div>
           <div className="session-meta">
             <span>{session.role === 'admin' ? 'Admin' : 'Participant'}: {session.name}</span>
             <button className="text-button" onClick={handleLogout}>
-              Log out
+              Sign out
             </button>
           </div>
         </header>
@@ -258,7 +258,7 @@ export default function App() {
     <div className="app-shell">
       <main>{content()}</main>
       <footer>
-        <p>Hosted on Railway • FastAPI + React</p>
+        <p>FastAPI · React · Railway</p>
       </footer>
     </div>
   );

@@ -9,8 +9,8 @@ export default function PollBoard({ polls, loading, onVote, voteHistory, isAdmin
   if (!loading && sortedPolls.length === 0) {
     return (
       <section className="card fill">
-        <h2>Welcome</h2>
-        <p className="helper">No polls yet. Admins can launch one instantly.</p>
+        <h2>Ready</h2>
+        <p className="helper">No polls yet. Start one to begin.</p>
       </section>
     );
   }
@@ -18,8 +18,8 @@ export default function PollBoard({ polls, loading, onVote, voteHistory, isAdmin
   return (
     <section className="card fill">
       <div className="list-header">
-        <h2>Live polls</h2>
-        {loading && <span className="helper">Refreshing…</span>}
+        <h2>Polls</h2>
+        {loading && <span className="helper">Updating…</span>}
       </div>
       <div className="poll-grid">
         {sortedPolls.map((poll) => {
@@ -36,7 +36,7 @@ export default function PollBoard({ polls, loading, onVote, voteHistory, isAdmin
                   <p className="helper">{statusLabel} · {totalVotes} vote{totalVotes === 1 ? '' : 's'}</p>
                 </div>
                 {isAdmin && poll.status === 'open' && (
-                  <span className="badge">Admin view</span>
+                  <span className="badge">Admin</span>
                 )}
               </header>
 
