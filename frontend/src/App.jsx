@@ -201,6 +201,7 @@ export default function App() {
     setPollAccess({});
     setActionMessage('');
     setJoinError('');
+    setJoinPending(false);
   }, []);
 
   const handleCreatePoll = useCallback(

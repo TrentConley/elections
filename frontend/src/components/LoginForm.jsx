@@ -25,12 +25,12 @@ export default function LoginForm({ onSubmit, error }) {
         <p className="tagline">Sign in and start.</p>
       </div>
       <label className="field">
-        <span>Name or admin key</span>
+        <span>Full Name</span>
         <input
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="Name or key"
+          placeholder="Eg Trent Conley"
           autoComplete="off"
           required
         />
