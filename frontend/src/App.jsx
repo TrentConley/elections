@@ -218,8 +218,7 @@ export default function App() {
       <>
         <header className="app-header">
           <div>
-            <h1>Quick Elections</h1>
-            <p className="tagline">Instant polls. Minimal noise.</p>
+            <h1>Beta Elections</h1>
           </div>
           <div className="session-meta">
             <span>{session.role === 'admin' ? 'Admin' : 'Participant'}: {session.name}</span>

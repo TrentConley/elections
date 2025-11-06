@@ -21,7 +21,7 @@ export default function LoginForm({ onSubmit, error }) {
   return (
     <form className="stack" onSubmit={handleSubmit}>
       <div className="stack small">
-        <h1>Quick Elections</h1>
+        <h1>Beta Elections</h1>
         <p className="tagline">Sign in and start.</p>
       </div>
       <label className="field">
