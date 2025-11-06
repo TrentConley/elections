@@ -5,6 +5,7 @@ const emptyOptionRow = () => ['', ''];
 export default function AdminPanel({ disabled, onCreatePoll, onClosePoll, polls }) {
   const [title, setTitle] = useState('');
   const [options, setOptions] = useState(['', '']);
+  const [accessCode, setAccessCode] = useState('');
   const [formError, setFormError] = useState('');
 
   const openPolls = useMemo(() => polls.filter((poll) => poll.status === 'open'), [polls]);
@@ -23,13 +24,14 @@ export default function AdminPanel({ disabled, onCreatePoll, onClosePoll, polls 
   const resetForm = () => {
     setTitle('');
     setOptions(emptyOptionRow());
+    setAccessCode('');
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setFormError('');
     try {
-      await onCreatePoll({ title, options });
+      await onCreatePoll({ title, options, accessCode });
       resetForm();
     } catch (error) {
       setFormError(error.message || 'Unable to create poll');
@@ -50,6 +52,17 @@ export default function AdminPanel({ disabled, onCreatePoll, onClosePoll, polls 
         <h2>New poll</h2>
         <p className="helper">Title plus two options. Keep it sharp.</p>
         <form className="stack" onSubmit={handleSubmit}>
+          <label className="field">
+            <span>Access code</span>
+            <input
+              type="text"
+              value={accessCode}
+              onChange={(event) => setAccessCode(event.target.value.toUpperCase())}
+              placeholder="Room code"
+              required
+              maxLength={32}
+            />
+          </label>
           <label className="field">
             <span>Title</span>
             <input
@@ -104,7 +117,7 @@ export default function AdminPanel({ disabled, onCreatePoll, onClosePoll, polls 
                 <li key={poll.id} className="poll-row">
                   <div>
                     <p className="poll-title">{poll.title}</p>
-                    <p className="helper">{totalVotes} vote{totalVotes === 1 ? '' : 's'}</p>
+                    <p className="helper">{totalVotes} vote{totalVotes === 1 ? '' : 's'} · Code {poll.access_code}</p>
                   </div>
                   <button className="text-button" onClick={() => handleClose(poll.id)}>
                     Close poll

@@ -5,6 +5,7 @@ import PollBoard from './components/PollBoard.jsx';
 
 const STORAGE_KEY = 'quick-election-session';
 const VOTE_STORAGE_KEY = 'quick-election-votes';
+const ACCESS_CODES_KEY = 'quick-election-access-codes';
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 const initialSession = () => {
@@ -34,6 +35,16 @@ const initialVotes = () => {
   }
 };
 
+const initialAccessCodes = () => {
+  try {
+    const stored = localStorage.getItem(ACCESS_CODES_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch (error) {
+    console.warn('Unable to restore poll access', error);
+    return {};
+  }
+};
+
 export default function App() {
   const [session, setSession] = useState(initialSession);
   const [polls, setPolls] = useState([]);
@@ -43,6 +54,9 @@ export default function App() {
   const [creatingPoll, setCreatingPoll] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [voteHistory, setVoteHistory] = useState(initialVotes);
+  const [pollAccess, setPollAccess] = useState(initialAccessCodes);
+  const [joinPending, setJoinPending] = useState(false);
+  const [joinError, setJoinError] = useState('');
 
   const isAdmin = session?.role === 'admin';
 
@@ -66,31 +80,97 @@ export default function App() {
     localStorage.setItem(VOTE_STORAGE_KEY, JSON.stringify(voteHistory));
   }, [voteHistory]);
 
+  useEffect(() => {
+    localStorage.setItem(ACCESS_CODES_KEY, JSON.stringify(pollAccess));
+  }, [pollAccess]);
+
   const fetchPolls = useCallback(async () => {
+    if (!isAdmin) {
+      return;
+    }
     setPollsError('');
     setPollsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/polls`);
+      const response = await fetch(`${API_BASE}/api/polls`, {
+        headers,
+      });
       if (!response.ok) {
         throw new Error('Failed to load polls');
       }
       const data = await response.json();
-      setPolls(data.filter((poll) => poll.status === 'open'));
+      const openPolls = data.filter((poll) => poll.status === 'open');
+      setPolls(openPolls);
     } catch (error) {
       setPollsError(error.message || 'Unable to fetch polls');
     } finally {
       setPollsLoading(false);
     }
-  }, []);
+  }, [headers, isAdmin]);
+
+  const refreshAccessiblePolls = useCallback(async () => {
+    if (!session || isAdmin) {
+      return;
+    }
+    const entries = Object.entries(pollAccess);
+    if (entries.length === 0) {
+      setPolls([]);
+      return;
+    }
+    setPollsLoading(true);
+    setPollsError('');
+    try {
+      const results = await Promise.all(entries.map(async ([pollId, code]) => {
+        try {
+          const response = await fetch(`${API_BASE}/api/polls/access`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+          });
+          if (!response.ok) {
+            if (response.status === 404) {
+              setPollAccess((prev) => {
+                if (!prev[pollId]) {
+                  return prev;
+                }
+                const next = { ...prev };
+                delete next[pollId];
+                return next;
+              });
+              return null;
+            }
+            const detail = await response.json().catch(() => ({}));
+            throw new Error(detail?.detail || 'Unable to load poll');
+          }
+          return await response.json();
+        } catch (error) {
+          if (error instanceof Error) {
+            throw error;
+          }
+          throw new Error('Unable to load poll');
+        }
+      }));
+      const nextPolls = results.filter(Boolean);
+      setPolls(nextPolls);
+    } catch (error) {
+      setPollsError(error.message || 'Unable to load polls');
+    } finally {
+      setPollsLoading(false);
+    }
+  }, [API_BASE, isAdmin, pollAccess, session]);
 
   useEffect(() => {
     if (!session) {
       return;
     }
-    fetchPolls();
-    const interval = setInterval(fetchPolls, 5000);
+    if (isAdmin) {
+      fetchPolls();
+      const interval = setInterval(fetchPolls, 5000);
+      return () => clearInterval(interval);
+    }
+    refreshAccessiblePolls();
+    const interval = setInterval(refreshAccessiblePolls, 5000);
     return () => clearInterval(interval);
-  }, [session, fetchPolls]);
+  }, [session, isAdmin, fetchPolls, refreshAccessiblePolls]);
 
   const handleLogin = useCallback(async (name) => {
     setAuthError('');
@@ -118,11 +198,13 @@ export default function App() {
     setSession(null);
     setPolls([]);
     setVoteHistory({});
+    setPollAccess({});
     setActionMessage('');
+    setJoinError('');
   }, []);
 
   const handleCreatePoll = useCallback(
-    async ({ title, options }) => {
+    async ({ title, options, accessCode }) => {
       if (!isAdmin) {
         return;
       }
@@ -133,7 +215,7 @@ export default function App() {
         const response = await fetch(`${API_BASE}/api/polls`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ title, options }),
+          body: JSON.stringify({ title, options, access_code: accessCode }),
         });
         if (!response.ok) {
           const { detail } = await response.json();
@@ -177,6 +259,14 @@ export default function App() {
           delete next[pollId];
           return next;
         });
+        setPollAccess((prev) => {
+          if (!prev[pollId]) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next[pollId];
+          return next;
+        });
         setActionMessage('Poll closed');
       } catch (error) {
         setPollsError(error.message || 'Unable to close poll');
@@ -212,6 +302,42 @@ export default function App() {
     },
     [session],
   );
+
+  const handleJoinPoll = useCallback(async (code) => {
+    const normalized = code.trim().toUpperCase();
+    if (!normalized) {
+      setJoinError('Code is required');
+      return;
+    }
+    setJoinError('');
+    setJoinPending(true);
+    setPollsError('');
+    try {
+      const response = await fetch(`${API_BASE}/api/polls/access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: normalized }),
+      });
+      if (!response.ok) {
+        const { detail } = await response.json();
+        throw new Error(detail || 'Invalid code');
+      }
+      const poll = await response.json();
+      setPolls((prev) => {
+        const existing = prev.find((item) => item.id === poll.id);
+        if (existing) {
+          return prev.map((item) => (item.id === poll.id ? poll : item));
+        }
+        return [poll, ...prev];
+      });
+      setPollAccess((prev) => ({ ...prev, [poll.id]: normalized }));
+      setActionMessage('Poll unlocked');
+    } catch (error) {
+      setJoinError(error.message || 'Invalid code');
+    } finally {
+      setJoinPending(false);
+    }
+  }, []);
 
   const content = () => {
     if (!session) {
@@ -255,6 +381,10 @@ export default function App() {
             onVote={handleVote}
             voteHistory={voteHistory}
             isAdmin={isAdmin}
+            onJoinPoll={handleJoinPoll}
+            joinPending={joinPending}
+            joinError={joinError}
+            clearJoinError={() => setJoinError('')}
           />
         </div>
       </>

@@ -35,6 +35,7 @@ class PollOptionRecord:
 class PollRecord:
     id: str
     title: str
+    access_code: str
     status: str = PollStatus.OPEN
     created_at: datetime = field(default_factory=datetime.utcnow)
     closed_at: Optional[datetime] = None
@@ -72,11 +73,13 @@ class PollResponse(BaseModel):
     created_at: datetime
     closed_at: Optional[datetime] = None
     options: List[PollOption]
+    access_code: Optional[str] = None
 
 
 class CreatePollRequest(BaseModel):
     title: str
     options: List[str]
+    access_code: str
 
     @validator("title")
     def validate_title(cls, value: str) -> str:
@@ -99,6 +102,26 @@ class CreatePollRequest(BaseModel):
             raise ValueError("At least two unique options are required")
         return unique
 
+    @validator("access_code")
+    def validate_access_code(cls, value: str) -> str:
+        code = value.strip().upper()
+        if not code:
+            raise ValueError("Access code is required")
+        if len(code) > 32:
+            raise ValueError("Access code must be 32 characters or fewer")
+        return code
+
+
+class AccessPollRequest(BaseModel):
+    code: str
+
+    @validator("code")
+    def validate_code(cls, value: str) -> str:
+        code = value.strip().upper()
+        if not code:
+            raise ValueError("Code is required")
+        return code
+
 
 class VoteRequest(BaseModel):
     voter_name: str
@@ -117,7 +140,7 @@ class PollStore:
         self._lock = Lock()
         self._polls: Dict[str, PollRecord] = {}
 
-    def _to_response(self, record: PollRecord) -> PollResponse:
+    def _to_response(self, record: PollRecord, *, include_code: bool = False) -> PollResponse:
         options = [
             PollOption(id=option.id, label=option.label, votes=option.votes)
             for option in record.options.values()
@@ -130,24 +153,29 @@ class PollStore:
             created_at=record.created_at,
             closed_at=record.closed_at,
             options=options,
+            access_code=record.access_code if include_code else None,
         )
 
-    def all_polls(self) -> List[PollResponse]:
+    def all_polls(self, *, include_codes: bool = False) -> List[PollResponse]:
         with self._lock:
             records = list(self._polls.values())
         records.sort(key=lambda poll: poll.created_at, reverse=True)
-        return [self._to_response(record) for record in records]
+        return [self._to_response(record, include_code=include_codes) for record in records]
 
-    def create_poll(self, title: str, options: List[str]) -> PollResponse:
+    def create_poll(self, title: str, options: List[str], access_code: str) -> PollResponse:
         with self._lock:
             poll_id = uuid4().hex
+            normalized_code = access_code.strip().upper()
+            for poll in self._polls.values():
+                if poll.access_code == normalized_code and poll.status == PollStatus.OPEN:
+                    raise ValueError("Access code already in use")
             option_records = {}
             for label in options:
                 option_id = uuid4().hex
                 option_records[option_id] = PollOptionRecord(id=option_id, label=label)
-            poll = PollRecord(id=poll_id, title=title, options=option_records)
+            poll = PollRecord(id=poll_id, title=title, access_code=normalized_code, options=option_records)
             self._polls[poll_id] = poll
-        return self._to_response(poll)
+        return self._to_response(poll, include_code=True)
 
     def close_poll(self, poll_id: str) -> PollResponse:
         with self._lock:
@@ -156,7 +184,7 @@ class PollStore:
                 raise KeyError("Poll not found")
             poll.status = PollStatus.CLOSED
             poll.closed_at = datetime.utcnow()
-        return self._to_response(poll)
+        return self._to_response(poll, include_code=True)
 
     def vote(self, poll_id: str, voter_name: str, option_id: str) -> PollResponse:
         voter_key = voter_name.strip().lower()
@@ -174,6 +202,14 @@ class PollStore:
             option.votes += 1
             poll.voters[voter_key] = option_id
         return self._to_response(poll)
+
+    def poll_by_code(self, code: str) -> PollResponse:
+        normalized = code.strip().upper()
+        with self._lock:
+            for poll in self._polls.values():
+                if poll.access_code == normalized and poll.status == PollStatus.OPEN:
+                    return self._to_response(poll)
+        raise KeyError("Poll not found")
 
 
 poll_store = PollStore()
@@ -203,14 +239,14 @@ def login(payload: LoginRequest) -> LoginResponse:
 
 
 @app.get("/api/polls", response_model=List[PollResponse])
-def list_polls() -> List[PollResponse]:
-    return poll_store.all_polls()
+def list_polls(_: None = Depends(require_admin)) -> List[PollResponse]:
+    return poll_store.all_polls(include_codes=True)
 
 
 @app.post("/api/polls", response_model=PollResponse, status_code=status.HTTP_201_CREATED)
 def create_poll(payload: CreatePollRequest, _: None = Depends(require_admin)) -> PollResponse:
     try:
-        return poll_store.create_poll(payload.title, payload.options)
+        return poll_store.create_poll(payload.title, payload.options, payload.access_code)
     except ValueError as exc:  # pragma: no cover - explicit message passed to user
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -230,6 +266,15 @@ def vote(poll_id: str, payload: VoteRequest) -> PollResponse:
 def close_poll(poll_id: str, _: None = Depends(require_admin)) -> PollResponse:
     try:
         return poll_store.close_poll(poll_id)
+    except KeyError as exc:
+        message = exc.args[0] if exc.args else "Poll not found"
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=message) from exc
+
+
+@app.post("/api/polls/access", response_model=PollResponse)
+def access_poll(payload: AccessPollRequest) -> PollResponse:
+    try:
+        return poll_store.poll_by_code(payload.code)
     except KeyError as exc:
         message = exc.args[0] if exc.args else "Poll not found"
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=message) from exc
