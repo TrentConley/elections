@@ -126,6 +126,7 @@ class AccessPollRequest(BaseModel):
 class VoteRequest(BaseModel):
     voter_name: str
     option_id: str
+    code: str
 
     @validator("voter_name")
     def validate_voter_name(cls, value: str) -> str:
@@ -133,6 +134,15 @@ class VoteRequest(BaseModel):
         if not voter:
             raise ValueError("Voter name is required")
         return voter
+
+    @validator("code")
+    def validate_code(cls, value: str) -> str:
+        code = value.strip().upper()
+        if not code:
+            raise ValueError("Code is required")
+        if len(code) > 32:
+            raise ValueError("Code must be 32 characters or fewer")
+        return code
 
 
 class PollStore:
@@ -186,7 +196,7 @@ class PollStore:
             poll.closed_at = datetime.utcnow()
         return self._to_response(poll, include_code=True)
 
-    def vote(self, poll_id: str, voter_name: str, option_id: str) -> PollResponse:
+    def vote(self, poll_id: str, voter_name: str, option_id: str, code: str) -> PollResponse:
         voter_key = voter_name.strip().lower()
         with self._lock:
             poll = self._polls.get(poll_id)
@@ -194,6 +204,8 @@ class PollStore:
                 raise KeyError("Poll not found")
             if poll.status != PollStatus.OPEN:
                 raise ValueError("Poll is closed")
+            if poll.access_code != code.strip().upper():
+                raise ValueError("Invalid code for this poll")
             if voter_key in poll.voters:
                 raise ValueError("This voter has already voted in this poll")
             option = poll.options.get(option_id)
@@ -254,7 +266,7 @@ def create_poll(payload: CreatePollRequest, _: None = Depends(require_admin)) ->
 @app.post("/api/polls/{poll_id}/vote", response_model=PollResponse)
 def vote(poll_id: str, payload: VoteRequest) -> PollResponse:
     try:
-        return poll_store.vote(poll_id, payload.voter_name, payload.option_id)
+        return poll_store.vote(poll_id, payload.voter_name, payload.option_id, payload.code)
     except KeyError as exc:
         message = exc.args[0] if exc.args else "Poll not found"
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=message) from exc

@@ -278,8 +278,12 @@ export default function App() {
   );
 
   const handleVote = useCallback(
-    async (pollId, optionId) => {
+    async (pollId, optionId, code) => {
       if (!session?.name) {
+        return;
+      }
+      if (!code) {
+        setPollsError('Access code required');
         return;
       }
       setPollsError('');
@@ -287,7 +291,7 @@ export default function App() {
         const response = await fetch(`${API_BASE}/api/polls/${pollId}/vote`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ voter_name: session.name, option_id: optionId }),
+          body: JSON.stringify({ voter_name: session.name, option_id: optionId, code }),
         });
         if (!response.ok) {
           const { detail } = await response.json();
@@ -301,7 +305,7 @@ export default function App() {
         setPollsError(error.message || 'Unable to vote');
       }
     },
-    [session],
+    [API_BASE, session],
   );
 
   const handleJoinPoll = useCallback(async (code) => {
@@ -386,6 +390,7 @@ export default function App() {
             joinPending={joinPending}
             joinError={joinError}
             clearJoinError={() => setJoinError('')}
+            pollAccess={pollAccess}
           />
         </div>
       </>

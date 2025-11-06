@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-export default function PollBoard({ polls, loading, onVote, voteHistory, isAdmin, onJoinPoll, joinPending, joinError, clearJoinError }) {
+export default function PollBoard({ polls, loading, onVote, voteHistory, isAdmin, onJoinPoll, joinPending, joinError, clearJoinError, pollAccess }) {
   const sortedPolls = useMemo(() => {
     const next = [...polls];
     return next.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -102,6 +102,8 @@ export default function PollBoard({ polls, loading, onVote, voteHistory, isAdmin
           const voterChoice = voteHistory[poll.id];
           const statusLabel = poll.status === 'open' ? 'Open' : 'Closed';
 
+          const pollCode = isAdmin ? poll.access_code : pollAccess?.[poll.id];
+
           return (
             <article key={poll.id} className={`poll-card ${poll.status}`}>
               <header>
@@ -121,7 +123,7 @@ export default function PollBoard({ polls, loading, onVote, voteHistory, isAdmin
                 {poll.options.map((option) => {
                   const percent = totalVotes ? Math.round((option.votes / totalVotes) * 100) : 0;
                   const isSelected = voterChoice === option.id;
-                  const disabled = poll.status !== 'open' || (hasVoted && !isSelected);
+                  const disabled = poll.status !== 'open' || !pollCode || (hasVoted && !isSelected);
 
                   return (
                     <li key={option.id} className={`option-row ${isSelected ? 'selected' : ''}`}>
@@ -138,7 +140,7 @@ export default function PollBoard({ polls, loading, onVote, voteHistory, isAdmin
                             className="ghost"
                             type="button"
                             disabled={disabled}
-                            onClick={() => onVote(poll.id, option.id)}
+                            onClick={() => onVote(poll.id, option.id, pollCode)}
                           >
                             {isSelected ? 'Voted' : hasVoted ? 'Locked' : 'Vote'}
                           </button>
