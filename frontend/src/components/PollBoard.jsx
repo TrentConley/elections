@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export default function PollBoard({ polls, loading, onVote, voteHistory, isAdmin, onJoinPoll, joinPending, joinError, clearJoinError }) {
   const sortedPolls = useMemo(() => {
@@ -7,11 +7,13 @@ export default function PollBoard({ polls, loading, onVote, voteHistory, isAdmin
   }, [polls]);
 
   const [code, setCode] = useState('');
+  const wasPending = useRef(false);
 
   useEffect(() => {
-    if (!joinPending && !joinError) {
+    if (wasPending.current && !joinPending && !joinError) {
       setCode('');
     }
+    wasPending.current = joinPending;
   }, [joinPending, joinError]);
 
   const handleSubmit = (event) => {

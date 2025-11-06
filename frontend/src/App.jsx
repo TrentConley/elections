@@ -337,7 +337,7 @@ export default function App() {
     } finally {
       setJoinPending(false);
     }
-  }, []);
+  }, [API_BASE]);
 
   const content = () => {
     if (!session) {
